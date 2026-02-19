@@ -9,8 +9,10 @@ on:
 
 jobs:
   explore:
+    # This captures the environment input, and uses it to access the GitHub Environment-linked
+    # variables for this job, see below.
     environment: ${{ github.event.inputs.environment }}
-    
+
     runs-on: ubuntu-latest      
 
     steps:
@@ -32,7 +34,25 @@ jobs:
         env:
           VARS_CONTEXT: ${{ toJSON(vars) }}
         run: |-
-          echo -e "\n\n==================== VARS CONTEXT ====================\n\n"
+          echo -e "\n\n==================== VARS CONTEXT ===================="
+          echo -e "This includes all GitHub Repository- and Environment-specific variables."
+          echo -e "Access these with \$\{\{ vars.CONTEXT_VARIABLE_NAME \}\} to get the associated VALUE."
+          echo -e "To get these into environment variables for the current step you can use:"
+          echo -e "jobs:'
+          echo -e "  job-name-here:"
+          echo -e "    environment: \$\{\{ github.event.inputs.environment \}\}"
+          echo -e "    runs-on: ..."
+          echo -e "    steps:"
+          echo -e "      - name: step-name-here"
+          echo -e "        env:"
+          echo -e "          LOCAL_ENVIRONMENT_VARIABLE: \$\{\{ vars.CONTEXT_VARIABLE_NAME \}\}"
+          echo -e "        run: |-"
+          echo -e "          echo \"Hello World, LOCAL_ENVIRONMENT_VARIABLE set to $LOCAL_ENVIRONMENT_VARIABLE\""
+
+          echo -e "To get these into environment variables for the current step you can use:"
+          echo -e "To get these into environment variables for the current step you can use:"
+          echo -e "==================== VARS CONTEXT ====================\n\n"
+          
           echo "$VARS_CONTEXT"
 
       - name: Write runner context to log

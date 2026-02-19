@@ -32,13 +32,28 @@ permissions:
   id-token: write  
 
 jobs:
+  grab_github_variables:
+    name: Grab GitHub Variables
+    # This captures the environment input, and uses it to access the GitHub Environment-linked
+    # variables for this job, see below.
+    environment:                 ${{ github.event.inputs.environment }}
+    runs-on:                     ubuntu_latest
+    env:
+      LOCAL_PROJECT_ENVIRONMENT: ${{ vars.PROJECT_ENVIRONMENT }}
+      LOCAL_REPO_VARIABLE:       ${{ vars.REPO_VARIABLE }}
+    steps:
+      - name: Access Local Environmemt Variables
+        run: |-
+          echo -e "LOCAL_PROJECT_ENVIRONMENT: $LOCAL_PROJECT_ENVIRONMENT"
+          echo -e "LOCAL_REPO_VARIABLE      : $LOCAL_REPO_VARIABLE"
+
   capture_context:
     uses: ./.github/workflows/Reusable_Capture_Context.yaml
     with:
-        environment: ${{ github.event.inputs.environment }}
+        environment:             ${{ github.event.inputs.environment }}
 
   # terraform_operation:
   #   uses: ./.github/workflows/Reusable_Terraform_Operations.yaml
   #   with:
-  #       environment: ${{ github.event.inputs.environment }}
-  #       terraform_action: ${{ github.event.inputs.action }}
+  #       environment:           ${{ github.event.inputs.environment }}
+  #       terraform_action:      ${{ github.event.inputs.action }}
