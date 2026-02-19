@@ -37,7 +37,7 @@ jobs:
     # This captures the environment input, and uses it to access the GitHub Environment-linked
     # variables for this job, see below.
     environment:                 ${{ github.event.inputs.environment }}
-    runs-on:                     ubuntu_latest
+    runs-on:                     ubuntu-latest      
     env:
       LOCAL_PROJECT_ENVIRONMENT: ${{ vars.PROJECT_ENVIRONMENT }}
       LOCAL_REPO_VARIABLE:       ${{ vars.REPO_VARIABLE }}
