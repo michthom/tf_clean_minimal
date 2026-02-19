@@ -48,10 +48,10 @@ jobs:
     steps:
       - name: Access Local Environmemt Variables
         run: |-
-          echo -e "LOCAL_PROJECT_ENVIRONMENT: $LOCAL_PROJECT_ENVIRONMENT"
-          echo -e "LOCAL_REPO_VARIABLE      : $LOCAL_REPO_VARIABLE"
-          echo -e "LOCAL_GH_EVENT_ACTION    : $LOCAL_GITHUB_EVENT_ACTION"
-          echo -e "LOCAL_GITHUB_EVENT_ENVT  : $LOCAL_GITHUB_EVENT_ENVT"
+          echo -e "LOCAL_PROJECT_ENVIRONMENT : $LOCAL_PROJECT_ENVIRONMENT"
+          echo -e "LOCAL_REPO_VARIABLE       : $LOCAL_REPO_VARIABLE"
+          echo -e "LOCAL_GH_EVENT_ACTION     : $LOCAL_GH_EVENT_ACTION"
+          echo -e "LOCAL_GH_EVENT_ENVIRONMENT: $LOCAL_GH_EVENT_ENVIRONMENT"
 
   capture_context:
     uses: ./.github/workflows/Reusable_Capture_Context.yaml
