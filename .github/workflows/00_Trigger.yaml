@@ -47,19 +47,33 @@ jobs:
       LOCAL_GH_EVENT_ENVIRONMENT:      ${{ github.event.inputs.environment }}
     steps:
       - name: Access Local Environmemt Variables
+        id: local_envs
         run: |-
           echo -e "LOCAL_PROJECT_ENVIRONMENT : $LOCAL_PROJECT_ENVIRONMENT"
           echo -e "LOCAL_REPO_VARIABLE       : $LOCAL_REPO_VARIABLE"
           echo -e "LOCAL_GH_EVENT_ACTION     : $LOCAL_GH_EVENT_ACTION"
           echo -e "LOCAL_GH_EVENT_ENVIRONMENT: $LOCAL_GH_EVENT_ENVIRONMENT"
 
-  capture_context:
+  reusable_capture_context:
+    name: Reusable - Capture Context
     uses: ./.github/workflows/Reusable_Capture_Context.yaml
     with:
         environment:                   ${{ github.event.inputs.environment }}
 
-  # terraform_operation:
-  #   uses: ./.github/workflows/Reusable_Terraform_Operations.yaml
-  #   with:
-  #       environment:                 ${{ github.event.inputs.environment }}
-  #       terraform_action:            ${{ github.event.inputs.action }}
+  reusable_terraform_operation:
+    name: Reusable - Terraform Operation
+    uses: ./.github/workflows/Reusable_Terraform_Operations.yaml
+    with:
+        environment:                 ${{ github.event.inputs.environment }}
+        # FIXME - need to update terraforn_action to be calculated based on the trigger event:
+        #   - Pull Request onto dev or main branch, opened, edited, synchronize, etc:
+        #     - PLAN on each layer only
+        #   - Pull Request merged and closed onto dev or main branch
+        #     - APPLY on each layer with auto-approve=true
+        #   - Release published on the main branch
+        #     - PLAN then APPLY on each layer with auto-approve=true
+        terraform_action:            ${{ github.event.inputs.action }}
+        
+        # FIXME - need to update these to GitHub environment-specifc variables!
+        aws_region:                  eu-west-2
+        tf_deploy_role_arn:          arn:aws:iam::667532145122:role/667532145122-codebuild-github-runner

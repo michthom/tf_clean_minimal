@@ -36,7 +36,6 @@ jobs:
     environment: ${{ github.event.inputs.environment }}
 
     outputs:
-
       # The 12-digit AWS Account ID resolved by assuming the Terraform deployment role supplied by the environment
       account_id:         ${{ steps.aws_identity.outputs.account_id }}
       
@@ -44,6 +43,15 @@ jobs:
       config_layers_json: ${{ steps.get_config_layers.outputs.config_layers_json }}
 
     steps:
+      - name: Write short summary of the github context to log
+        id: gh_context_summary
+        run: |-
+          echo -e "\n\n================ GITHUB CONTEXT SUMMARY ================\n\n"
+          echo "          Event Name: ${{ github.event_name }}"
+          echo "            Ref Type: ${{ github.ref_type }}"
+          echo "            Ref_name: ${{ github.ref_name }}"
+          echo "         Environment: ${{ github.event.inputs.environment }}"
+
       - name: Configure AWS credentials
         id: aws_credentials
         uses: aws-actions/configure-aws-credentials@v6
@@ -52,7 +60,7 @@ jobs:
           role-to-assume: ${{ github.event.inputs.tf_deploy_role_arn }}
           audience: sts.amazonaws.com
           
-      - name: Get Account ID
+      - name: AWS Identity
         id: aws_identity
         run: |
           ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
@@ -70,7 +78,9 @@ jobs:
           # Get the list of configuration layers (subdirectories in source/terraform/configuration_layers)
           # N.B. FRAGILE / REQUIREMENT - this depends on the configuration layer names containing no spaces.
           # Also the assumption is that the layer names sort lexically into the right order for plan/apply
-          # and the reverse sort order for destroy operations.
+          # and the reverse sort order for destroy operations.
+
+          # FIXME - Need to pass the PATH_TO_CONFIG_LAYERS from repository variables in here
 
           CONFIG_LAYER_PATH="source/terraform/configuration_layers"
 
@@ -122,6 +132,7 @@ jobs:
   terraform-job:
     runs-on: ubuntu-latest
     # runs-on: codebuild-667532145122-github-runner-${{ github.run_id }}-${{ github.run_attempt }}
+
     needs: get-config-layers
     steps:
       # See: https://github.com/hashicorp/setup-terraform
@@ -145,19 +156,19 @@ jobs:
 
         env:
           ENVIRONMENT:        ${{ github.event.inputs.environment }}
-          ACTION:             ${{ github.event.inputs.action }}
+          TERRAFORM_ACTION:   ${{ github.event.inputs.terraform_action }}
           ACCOUNT_ID:         ${{ needs.get-config-layers.outputs.account_id }}
           CONFIG_LAYERS_JSON: ${{ needs.get-config-layers.outputs.config_layers_json }}
           
         run: |-
-          #   echo "Configuration Layers JSON: $CONFIG_LAYERS_JSON"
-          #   echo "AWS Account ID: $ACCOUNT_ID"
-          #   echo "Environment: $ENVIRONMENT"
-          #   echo "Action: $ACTION"
+          echo "Configuration Layers JSON: $CONFIG_LAYERS_JSON"
+          echo "AWS Account ID           : $ACCOUNT_ID"
+          echo "Environment              : $ENVIRONMENT"
+          echo "Terraform Action         : $ACTION"
 
           PARSED_JSON=${{ fromJSON( env.CONFIG_LAYERS_JSON ) }}
 
-          if terraform_action=$(echo "${{ github.event.inputs.terraform_action }}" | tr '[:upper:]' '[:lower:]'); then
+          if terraform_action=$(echo "$TERRAFORM_ACTION" | tr '[:upper:]' '[:lower:]'); then
             case "$terraform_action" in
               "plan"|"apply")
                 SORTED_LAYERS=$(jq --raw-output '.configuration_layers[]' <<< $PARSED_JSON | sort)
@@ -187,10 +198,23 @@ jobs:
             echo -e "\n\n============================================================="
             echo "Terraform INIT in config layer: $config_layer"
 
-            # Terraform init
-            terraform -chdir=source/terraform/configuration_layers/$config_layer init \
-              -backend-config=../../environments/${ENVIRONMENT}.tfbackend \
-              -reconfigure
+            # FIXME - Need to pass the AWS_REGION from environment in here
+            # FIXME - Need to pass the TF_STATE_BUCKET_NAME from environment in here
+            # FIXME - Need to pass the PATH_TO_CONFIG_LAYERS from repository variables in here
+
+            # Terraform init - old way using config files in repo
+            # terraform -chdir=source/terraform/configuration_layers/$config_layer init \
+            #   -backend-config=../../environments/${ENVIRONMENT}.tfbackend \
+            #   -reconfigure
+
+            # Terraform init - new way using environment variables
+            # terraform -chdir=$PATH_TO_CONFIG_LAYERS/$config_layer init \
+            #   -backend-config="region=VALUE" \
+            #   -backend-config="bucket=VALUE" \
+            #   -backend-config="key=/${ENVIRONMENT}/$config_layer/terraform.tfstate" \
+            #   -input=false
+            #   -reconfigure
+
 
             # Terraform plan / apply / destroy
             case "$terraform_action" in
@@ -198,28 +222,56 @@ jobs:
                 echo -e "\n\n============================================================="
                 echo "Terraform PLAN in config layer: $config_layer"
 
-                terraform -chdir=source/terraform/configuration_layers/$config_layer plan \
-                  -var-file=./config/${ENVIRONMENT}.tfvars \
-                  -var-file=../../environments/${ENVIRONMENT}.tfvars \
-                  -var-file=../../global.tfvars
+                # Terraform init - old way using config files in repo
+                # terraform -chdir=source/terraform/configuration_layers/$config_layer plan \
+                #   -var-file=./config/${ENVIRONMENT}.tfvars \
+                #   -var-file=../../environments/${ENVIRONMENT}.tfvars \
+                #   -var-file=../../global.tfvars
+
+                # Terraform init - new way using environment variables
+                # terraform -chdir=$PATH_TO_CONFIG_LAYERS/$config_layer plan \
+                #   -var 'project_name=$PROJECT_NAME'
+                #   -var 'aws_region=$AWS_REGION'
+                #   -var 'account_id=$ACCOUNT_ID'
+                #   -var 'environment=$ENVIRONMENT'
+                #   -input=false
                 ;;
+
               "apply")
                 echo -e "\n\n============================================================="
                 echo "Terraform APPLY in config layer: $config_layer"
 
-                terraform -chdir=source/terraform/configuration_layers/$config_layer apply -auto-approve \
-                  -var-file=./config/${ENVIRONMENT}.tfvars \
-                  -var-file=../../environments/${ENVIRONMENT}.tfvars \
-                  -var-file=../../global.tfvars
+                # Terraform init - old way using config files in repo
+                # terraform -chdir=source/terraform/configuration_layers/$config_layer apply -auto-approve \
+                #   -var-file=./config/${ENVIRONMENT}.tfvars \
+                #   -var-file=../../environments/${ENVIRONMENT}.tfvars \
+                #   -var-file=../../global.tfvars
+
+                # Terraform init - new way using environment variables
+                # terraform -chdir=$PATH_TO_CONFIG_LAYERS/$config_layer apply -auto-approve \
+                #   -var 'project_name=$PROJECT_NAME'
+                #   -var 'aws_region=$AWS_REGION'
+                #   -var 'account_id=$ACCOUNT_ID'
+                #   -var 'environment=$ENVIRONMENT'
+                #   -input=false
                 ;;
+
               "destroy")
                 echo -e "\n\n============================================================="
                 echo "Terraform DESTROY in config layer: $config_layer"
 
-                terraform -chdir=source/terraform/configuration_layers/$config_layer destroy -auto-approve \
-                  -var-file=./config/${ENVIRONMENT}.tfvars \
-                  -var-file=../../environments/${ENVIRONMENT}.tfvars \
-                  -var-file=../../global.tfvars
+                # terraform -chdir=source/terraform/configuration_layers/$config_layer destroy -auto-approve \
+                #   -var-file=./config/${ENVIRONMENT}.tfvars \
+                #   -var-file=../../environments/${ENVIRONMENT}.tfvars \
+                #   -var-file=../../global.tfvars
+
+                # Terraform init - new way using environment variables
+                # terraform -chdir=$PATH_TO_CONFIG_LAYERS/$config_layer destroy -auto-approve \
+                #   -var 'project_name=$PROJECT_NAME'
+                #   -var 'aws_region=$AWS_REGION'
+                #   -var 'account_id=$ACCOUNT_ID'
+                #   -var 'environment=$ENVIRONMENT'
+                #   -input=false                
                 ;;
               *)
                 echo "Invalid action: $terraform_action"
