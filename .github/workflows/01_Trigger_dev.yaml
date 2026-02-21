@@ -1,4 +1,4 @@
-name: 00 Trigger
+name: 01 Trigger Dev
 on:
   workflow_dispatch:
     inputs:
