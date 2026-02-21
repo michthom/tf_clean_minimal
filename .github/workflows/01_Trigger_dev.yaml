@@ -1,9 +1,5 @@
 name: 01 Trigger Dev
 on:
-  push:
-    branches:
-      - feature/*
-      
   workflow_dispatch:
     inputs:
       environment:
@@ -25,6 +21,10 @@ on:
           - destroy
         default: plan
 
+  push:
+    branches:
+      - feature/*
+      
 permissions:
   # pull-requests: read permits an action to list pull requests, required to act on PR events and to check the base branch of a PR
   pull-requests: read
