@@ -1,0 +1,79 @@
+name: 00 Trigger
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: Environment to deploy
+        required: true
+        type: choice
+        options:
+          - dev
+          - stg
+          - prd
+        default: dev
+      action:
+        description: Action to perform
+        required: true
+        type: choice
+        options:
+          - plan
+          - apply
+          - destroy
+        default: plan
+
+permissions:
+  # pull-requests: read permits an action to list pull requests, required to act on PR events and to check the base branch of a PR
+  pull-requests: read
+  # contents: read permits an action to list the commits, required to check the commit messages of a PR or a release, and to check the files changed in a PR
+  # This might not be needed in the context of this demo, but it's a common permission for Terraform workflows to check if the changes are only in specific paths (e.g., in a specific folder) to decide if the workflow should run or not  
+  contents: read
+  # Fetch an OpenID Connect (OIDC) token. This requires id-token: write. For more information,
+  # see OpenID Connect: https://docs.github.com/en/actions/deployment/security-hardening-your-deployments/about-security-hardening-with-openid-connect#updating-your-actions-for-oidc
+  id-token: write  
+
+jobs:
+  grab_github_variables:
+    name: Grab GitHub Variables
+    # This captures the environment input, and uses it to access the GitHub Environment-linked
+    # variables for this job, see below.
+    environment:                       ${{ github.event.inputs.environment }}
+    runs-on:                           ubuntu-latest      
+    env:
+      # Get repository and environment-specific variables from vars context
+      LOCAL_PROJECT_ENVIRONMENT:       ${{ vars.PROJECT_ENVIRONMENT }}
+      LOCAL_REPO_VARIABLE:             ${{ vars.REPO_VARIABLE }}
+      # Get input values from the event itself
+      LOCAL_GH_EVENT_ACTION:           ${{ github.event.inputs.action }}
+      LOCAL_GH_EVENT_ENVIRONMENT:      ${{ github.event.inputs.environment }}
+    steps:
+      - name: Access Local Environmemt Variables
+        id: local_envs
+        run: |-
+          echo -e "LOCAL_PROJECT_ENVIRONMENT : $LOCAL_PROJECT_ENVIRONMENT"
+          echo -e "LOCAL_REPO_VARIABLE       : $LOCAL_REPO_VARIABLE"
+          echo -e "LOCAL_GH_EVENT_ACTION     : $LOCAL_GH_EVENT_ACTION"
+          echo -e "LOCAL_GH_EVENT_ENVIRONMENT: $LOCAL_GH_EVENT_ENVIRONMENT"
+
+  reusable_capture_context:
+    name: Reusable - Capture Context
+    uses: ./.github/workflows/Reusable_Capture_Context.yaml
+    with:
+        environment:                   ${{ github.event.inputs.environment }}
+
+  reusable_terraform_operation:
+    name: Reusable - Terraform Operation
+    uses: ./.github/workflows/Reusable_Terraform_Operations.yaml
+    with:
+        environment:                 ${{ github.event.inputs.environment }}
+        # FIXME - need to update terraforn_action to be calculated based on the trigger event:
+        #   - Pull Request onto dev or main branch, opened, edited, synchronize, etc:
+        #     - PLAN on each layer only
+        #   - Pull Request merged and closed onto dev or main branch
+        #     - APPLY on each layer with auto-approve=true
+        #   - Release published on the main branch
+        #     - PLAN then APPLY on each layer with auto-approve=true
+        terraform_action:            ${{ github.event.inputs.action }}
+        
+        # FIXME - need to update these to GitHub environment-specifc variables!
+        aws_region:                  eu-west-2
+        tf_deploy_role_arn:          arn:aws:iam::667532145122:role/667532145122-codebuild-github-runner
